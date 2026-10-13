@@ -128,8 +128,8 @@ class LessonTests(APITestCase):
 
     def test_moderator_cannot_delete_lesson(self):
         moderator = User.objects.create_user(
-            email='moderator_test@example.com',
-            password='test_password',
+            email="moderator_test@example.com",
+            password="test_password",
         )
 
         moderator_group, _ = Group.objects.get_or_create(name="Moderator")
@@ -146,19 +146,19 @@ class LessonTests(APITestCase):
 
     def test_moderator_can_update_lesson(self):
         moderator = User.objects.create_user(
-            email='test_moderator@example.com',
-            password='test_password',
+            email="test_moderator@example.com",
+            password="test_password",
         )
 
-        moderator_group, _ = Group.objects.get_or_create(name='Moderator')
+        moderator_group, _ = Group.objects.get_or_create(name="Moderator")
         moderator_group.user_set.add(moderator)
 
         self.client.force_authenticate(moderator)
 
-        url = reverse('lesson-detail', args=[self.lesson.id])
+        url = reverse("lesson-detail", args=[self.lesson.id])
 
         data = {
-            'title': 'Test Moderator Update Lesson',
+            "title": "Test Moderator Update Lesson",
         }
 
         response = self.client.patch(url, data, format="json")
@@ -173,22 +173,22 @@ class LessonTests(APITestCase):
         url = reverse("lesson-list-create")
 
         data = {
-            'course': self.course.id,
-            'title': "Test Invalid Lesson",
-            'description': 'Lesson with invalid video url',
-            'video_url': 'https://example.com/video/123',
+            "course": self.course.id,
+            "title": "Test Invalid Lesson",
+            "description": "Lesson with invalid video url",
+            "video_url": "https://example.com/video/123",
         }
 
-        response = self.client.post(url, data, format='json')
+        response = self.client.post(url, data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('video_url', response.data)
-        self.assertFalse(Lesson.objects.filter(title='Test Invalid Lesson').exists())
+        self.assertIn("video_url", response.data)
+        self.assertFalse(Lesson.objects.filter(title="Test Invalid Lesson").exists())
 
     def test_unauthenticated_user_cannot_retrieve_lesson(self):
         self.client.force_authenticate(user=None)
 
-        url = reverse('lesson-detail', args=[self.lesson.id])
+        url = reverse("lesson-detail", args=[self.lesson.id])
 
         response = self.client.get(url)
 
@@ -212,12 +212,14 @@ class SubscriptionTests(APITestCase):
         self.client.force_authenticate(user=self.user)
 
     def test_subscription_create(self):
-        url = reverse('subscription')
+        url = reverse("subscription")
 
-        response = self.client.post(url, {'course_id': self.course.id}, format='json')
+        response = self.client.post(url, {"course_id": self.course.id}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(Subscription.objects.filter(user=self.user, course=self.course).exists())
+        self.assertTrue(
+            Subscription.objects.filter(user=self.user, course=self.course).exists()
+        )
 
     def test_subscription_delete(self):
         Subscription.objects.create(
@@ -225,20 +227,22 @@ class SubscriptionTests(APITestCase):
             course=self.course,
         )
 
-        url = reverse('subscription')
+        url = reverse("subscription")
 
-        response = self.client.post(url, {'course_id': self.course.id}, format='json')
+        response = self.client.post(url, {"course_id": self.course.id}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertFalse(Subscription.objects.filter(user=self.user, course=self.course).exists())
+        self.assertFalse(
+            Subscription.objects.filter(user=self.user, course=self.course).exists()
+        )
 
     def test_subscription_invalid_course(self):
-        url = reverse('subscription')
+        url = reverse("subscription")
 
         response = self.client.post(
             url,
-            {'course_id': 99999},
-            format='json',
+            {"course_id": 99999},
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -247,9 +251,11 @@ class SubscriptionTests(APITestCase):
     def test_unauthenticated_user_cannot_toggle_subscription(self):
         self.client.force_authenticate(user=None)
 
-        url = reverse('subscription')
+        url = reverse("subscription")
 
-        response = self.client.post(url, {'course_id': self.course.id}, format='json')
+        response = self.client.post(url, {"course_id": self.course.id}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertFalse(Subscription.objects.filter(user=self.user, course=self.course).exists())
+        self.assertFalse(
+            Subscription.objects.filter(user=self.user, course=self.course).exists()
+        )

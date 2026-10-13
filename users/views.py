@@ -1,39 +1,39 @@
 import stripe
-
-from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.http import HttpResponse
-
-from drf_spectacular.utils import extend_schema, OpenApiResponse
-
+from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, serializers, status
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import APIException
 
 from .models import Payment, User
 from .permissions import IsSelf
-from .serializers import (PaymentSerializer, UserRegistrationSerializer,
-                          UserSerializer)
-from .services import(create_stripe_price,
-create_stripe_product,
-create_stripe_session,
-retrieve_stripe_session,
+from .serializers import PaymentSerializer, UserRegistrationSerializer, UserSerializer
+from .services import (
+    create_stripe_price,
+    create_stripe_product,
+    create_stripe_session,
+    retrieve_stripe_session,
 )
 
 
 class PaymentErrorSerializer(serializers.Serializer):
     detail = serializers.CharField()
 
+
 class StripeStatusErrorSerializer(serializers.Serializer):
     error = serializers.CharField()
+
 
 class PaymentStatusSerializer(serializers.Serializer):
     payment_id = serializers.IntegerField()
     session_id = serializers.CharField()
     status = serializers.CharField()
     payment_status = serializers.CharField()
+
 
 class UserRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
@@ -50,8 +50,8 @@ class UserRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
 
 class StripePaymentError(APIException):
     status_code = 502
-    default_detail = 'Unable to create Stripe Session'
-    default_code = 'stripe_payment_error'
+    default_detail = "Unable to create Stripe Session"
+    default_code = "stripe_payment_error"
 
 
 class PaymentListAPIView(generics.ListCreateAPIView):
@@ -63,15 +63,20 @@ class PaymentListAPIView(generics.ListCreateAPIView):
     ordering = ["payment_date"]
 
     def get_queryset(self):
-        return Payment.objects.filter(
-            user=self.request.user,
-        )
+        if getattr(self, "swagger_fake_view", False):
+            return Payment.objects.none()
+
+        user = self.request.user
+        if not user.is_authenticated:
+            return Payment.objects.none()
+
+        return Payment.objects.filter(user=user)
 
     @extend_schema(
         description=(
-                "Создает платеж и автоматически создает "
-                "Product, Price и Checkout Session в Stripe. "
-                "Возвращает данные платежа и ссылку на оплату."
+            "Создает платеж и автоматически создает "
+            "Product, Price и Checkout Session в Stripe. "
+            "Возвращает данные платежа и ссылку на оплату."
         ),
         request=PaymentSerializer,
         responses={
@@ -101,7 +106,7 @@ class PaymentListAPIView(generics.ListCreateAPIView):
             elif payment.lesson:
                 product_name = payment.lesson.title
             else:
-                product_name = 'LMS Payment'
+                product_name = "LMS Payment"
 
             try:
                 product = create_stripe_product(product_name)
@@ -121,22 +126,23 @@ class PaymentListAPIView(generics.ListCreateAPIView):
 
             payment.save(
                 update_fields=[
-                    'stripe_product_id',
-                    'stripe_price_id',
+                    "stripe_product_id",
+                    "stripe_price_id",
                     "stripe_session_id",
                     "payment_link",
-                    'stripe_payment_status',
-                    'stripe_session_status',
+                    "stripe_payment_status",
+                    "stripe_session_status",
                 ]
             )
+
 
 class PaymentStatusAPIView(APIView):
 
     @extend_schema(
         description=(
-                "Получает актуальный статус платежной сессии "
-                "Stripe для платежа текущего пользователя. "
-                "Синхронизирует статус с базой данных."
+            "Получает актуальный статус платежной сессии "
+            "Stripe для платежа текущего пользователя. "
+            "Синхронизирует статус с базой данных."
         ),
         responses={
             200: PaymentStatusSerializer,
@@ -159,23 +165,27 @@ class PaymentStatusAPIView(APIView):
         },
     )
     def get(self, request, pk):
-        payment = get_object_or_404(Payment, pk=pk, user=request.user,)
+        payment = get_object_or_404(
+            Payment,
+            pk=pk,
+            user=request.user,
+        )
 
         if not payment.stripe_session_id:
             return Response(
-                {'error': 'Payment has no Stripe session.'},
+                {"error": "Payment has no Stripe session."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
             session = retrieve_stripe_session(payment.stripe_session_id)
         except stripe.error.InvalidRequestError:
             return Response(
-                {'error': 'Stripe session does not exist.'},
+                {"error": "Stripe session does not exist."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except stripe.error.StripeError:
             return Response(
-                {'error': 'Unable to retrieve Stripe payment status.'},
+                {"error": "Unable to retrieve Stripe payment status."},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -189,20 +199,25 @@ class PaymentStatusAPIView(APIView):
             ]
         )
 
-        return Response({
-            'payment_id': payment.id,
-            'session_id': session.id,
-            'status': session.status,
-            'payment_status': payment.stripe_payment_status,
-        })
+        return Response(
+            {
+                "payment_id": payment.id,
+                "session_id": session.id,
+                "status": session.status,
+                "payment_status": payment.stripe_payment_status,
+            }
+        )
+
 
 class UserRegistrationAPIView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [AllowAny]
 
+
 def payment_success(request):
-    return HttpResponse('Payment completed. Thank you!')
+    return HttpResponse("Payment completed. Thank you!")
+
 
 def payment_cancel(request):
-    return HttpResponse('Payment was cancelled.')
+    return HttpResponse("Payment was cancelled.")

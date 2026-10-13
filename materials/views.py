@@ -1,15 +1,25 @@
+from datetime import timedelta
+
+from django.db import transaction
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, status, viewsets, serializers
+from django.utils import timezone
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import generics, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 from users.permissions import IsModerator, IsOwner
 
 from .models import Course, Lesson, Subscription
 from .paginators import CoursePagination, LessonPagination
-from .serializers import CourseSerializer, LessonSerializer, SubscriptionRequestSerializer, SubscriptionResponseSerializer
+from .serializers import (
+    CourseSerializer,
+    LessonSerializer,
+    SubscriptionRequestSerializer,
+    SubscriptionResponseSerializer,
+)
+from .tasks import send_course_update_notification
 
 
 class CourseViewSet(viewsets.ModelViewSet):
@@ -43,6 +53,23 @@ class CourseViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+
+    def perform_update(self, serializer):
+        course = serializer.instance
+
+        previous_updated_at = course.updated_at
+
+        should_notify = timezone.now() - previous_updated_at > timedelta(hours=4)
+
+        with transaction.atomic():
+            updated_course = serializer.save()
+
+            if should_notify:
+                transaction.on_commit(
+                    lambda course_id=updated_course.pk: send_course_update_notification.delay(
+                        course_id
+                    )
+                )
 
 
 class LessonListCreateAPIView(generics.ListCreateAPIView):
@@ -89,13 +116,34 @@ class LessonRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
 
         return [permission() for permission in permission_classes]
 
+    def perform_update(self, serializer):
+        lesson = serializer.instance
+        course = lesson.course
+
+        previous_updated_at = course.updated_at
+
+        should_notify = timezone.now() - previous_updated_at > timedelta(hours=4)
+
+        with transaction.atomic():
+            serializer.save()
+
+            course.update_at = timezone.now()
+            course.save(update_fields=["updated_at"])
+
+            if should_notify:
+                transaction.on_commit(
+                    lambda course_id=course.pk: send_course_update_notification.delay(
+                        course_id
+                    )
+                )
+
 
 class SubscriptionAPIView(APIView):
 
     @extend_schema(
         description=(
-                "Добавляет подписку на курс или удаляет "
-                "существующую подписку текущего пользователя."
+            "Добавляет подписку на курс или удаляет "
+            "существующую подписку текущего пользователя."
         ),
         request=SubscriptionRequestSerializer,
         responses={
@@ -118,11 +166,8 @@ class SubscriptionAPIView(APIView):
             ),
         },
     )
-
     def post(self, request):
-        serializer = SubscriptionRequestSerializer(
-            data=request.data
-        )
+        serializer = SubscriptionRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         course_id = serializer.validated_data["course_id"]
