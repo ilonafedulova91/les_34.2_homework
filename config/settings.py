@@ -10,25 +10,31 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
-import os
-
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 load_dotenv(BASE_DIR / ".env")
-STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-qxnz1!eamck=hb7qpmmf8mb(*l0u24#ixd!j=o!d5@kw@qj4)%"
+SECRET_KEY = os.getenv("SECRET_KEY")
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+CELERY_BROKER_URL = os.getenv(
+    "CELERY_BROKER_URL",
+)
+
+CELERY_RESULT_BACKEND = os.getenv(
+    "CELERY_RESULT_BACKEND",
+)
 
 ALLOWED_HOSTS = []
 
@@ -47,6 +53,7 @@ INSTALLED_APPS = [
     "django_filters",
     "users",
     "materials",
+    "django_celery_beat",
 ]
 
 MIDDLEWARE = [
@@ -120,6 +127,18 @@ USE_I18N = True
 
 USE_TZ = True
 
+# Celery timezone settings
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = USE_TZ
+
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+CELERY_BEAT_SCHEDULE = {
+    "deactivate-inactive-users-daily": {
+        "task": "users.tasks.deactivate_inactive_users",
+        "schedule": crontab(hour=3, minute=0),
+    },
+}
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
@@ -143,7 +162,11 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'LMS API',
-    'DESCRIPTION': 'API documentation for the LMS project',
-    'VERSION': '1.0.0',
+    "TITLE": "LMS API",
+    "DESCRIPTION": "API documentation for the LMS project",
+    "VERSION": "1.0.0",
 }
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = "noreply@lms.local"

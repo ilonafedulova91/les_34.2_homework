@@ -9,28 +9,35 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = "__all__"
-        read_only_fields = ('user', 'stripe_product_id', 'stripe_price_id', 'stripe_session_id', 'payment_link', 'stripe_payment_status', 'stripe_session_status')
+        read_only_fields = (
+            "user",
+            "stripe_product_id",
+            "stripe_price_id",
+            "stripe_session_id",
+            "payment_link",
+            "stripe_payment_status",
+            "stripe_session_status",
+        )
 
     def validate_amount(self, value):
-        if value <= Decimal('0'):
-            raise serializers.ValidationError('Amount must be greater than zero')
+        if value <= Decimal("0"):
+            raise serializers.ValidationError("Amount must be greater than zero")
         return value
 
     def validate(self, attrs):
-        course = attrs.get('course')
-        lesson = attrs.get('lesson')
+        course = attrs.get("course")
+        lesson = attrs.get("lesson")
 
         if bool(course) == bool(lesson):
-            raise serializers.ValidationError('Select exactly one: course or lesson')
+            raise serializers.ValidationError("Select exactly one: course or lesson")
 
-        if attrs.get('payment_method') != Payment.STRIPE:
+        if attrs.get("payment_method") != Payment.STRIPE:
             raise serializers.ValidationError(
-                {
-                    'payment_method': ('This endpoint only supports Stripe payments')
-                }
+                {"payment_method": ("This endpoint only supports Stripe payments")}
             )
 
         return attrs
+
 
 class UserSerializer(serializers.ModelSerializer):
     payments = PaymentSerializer(many=True, read_only=True)

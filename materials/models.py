@@ -8,6 +8,7 @@ class Course(models.Model):
     preview = models.ImageField(upload_to="courses/previews/", blank=True, null=True)
     description = models.TextField()
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="courses")
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title

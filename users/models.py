@@ -46,12 +46,12 @@ class User(AbstractBaseUser, PermissionsMixin):
 class Payment(models.Model):
     CASH = "cash"
     TRANSFER = "transfer"
-    STRIPE = 'stripe'
+    STRIPE = "stripe"
 
     PAYMENT_METHOD_CHOICES = [
         (CASH, "Наличные"),
         (TRANSFER, "Перевод на счет"),
-        (STRIPE, 'Stripe'),
+        (STRIPE, "Stripe"),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payments")
