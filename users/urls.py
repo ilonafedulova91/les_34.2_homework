@@ -1,13 +1,8 @@
 from django.urls import path
 
-from .views import (
-    PaymentListAPIView,
-    PaymentStatusAPIView,
-    UserRegistrationAPIView,
-    UserRetrieveUpdateDestroyAPIView,
-    payment_cancel,
-    payment_success,
-)
+from .views import (PaymentListAPIView, PaymentStatusAPIView,
+                    UserRegistrationAPIView, UserRetrieveUpdateDestroyAPIView,
+                    payment_cancel, payment_success)
 
 urlpatterns = [
     path("register/", UserRegistrationAPIView.as_view(), name="user_register"),

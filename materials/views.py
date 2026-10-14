@@ -13,12 +13,9 @@ from users.permissions import IsModerator, IsOwner
 
 from .models import Course, Lesson, Subscription
 from .paginators import CoursePagination, LessonPagination
-from .serializers import (
-    CourseSerializer,
-    LessonSerializer,
-    SubscriptionRequestSerializer,
-    SubscriptionResponseSerializer,
-)
+from .serializers import (CourseSerializer, LessonSerializer,
+                          SubscriptionRequestSerializer,
+                          SubscriptionResponseSerializer)
 from .tasks import send_course_update_notification
 
 
@@ -127,7 +124,7 @@ class LessonRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
         with transaction.atomic():
             serializer.save()
 
-            course.update_at = timezone.now()
+            course.updated_at = timezone.now()
             course.save(update_fields=["updated_at"])
 
             if should_notify:

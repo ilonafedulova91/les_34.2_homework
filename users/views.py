@@ -11,13 +11,10 @@ from rest_framework.views import APIView
 
 from .models import Payment, User
 from .permissions import IsSelf
-from .serializers import PaymentSerializer, UserRegistrationSerializer, UserSerializer
-from .services import (
-    create_stripe_price,
-    create_stripe_product,
-    create_stripe_session,
-    retrieve_stripe_session,
-)
+from .serializers import (PaymentSerializer, UserRegistrationSerializer,
+                          UserSerializer)
+from .services import (create_stripe_price, create_stripe_product,
+                       create_stripe_session, retrieve_stripe_session)
 
 
 class PaymentErrorSerializer(serializers.Serializer):
